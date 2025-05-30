@@ -38,4 +38,4 @@ def update(frame):
 
 animation = animation.FuncAnimation(fig, update, frames=len(t), init_func=init, blit=True, interval=100)
 
-plt.show()
+#plt.show()
