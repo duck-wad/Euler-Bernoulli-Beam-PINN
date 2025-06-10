@@ -31,8 +31,9 @@ num_layers = 6
 # define the hyperparameters
 learning_rate = 1e-3
 epochs = 50
-lambda_1 = 1e-1 # balance term for boundary condition
-lambda_2 = 1e-4
+lambda_1 = 1e-2 # balance term for boundary condition
+lambda_2 = 1e-5 # balance term for PDE
+lambda_3 = 1e-1 # balance term for data loss
 batch_size = 1024
 
 
@@ -119,29 +120,45 @@ class BeamPINN(nn.Module):
 
         # need to do derivatives wrt the original X_domain tensor rather than splicing X_domain to get the 
         # x position tensor, that creates a new tensor and grad won't work
-        du = torch.autograd.grad(Y_domain, X_domain, torch.ones_like(Y_domain), create_graph=True)[0]
-        d2u = torch.autograd.grad(du, X_domain, torch.ones_like(du), create_graph=True)[0]
-        d3u = torch.autograd.grad(d2u, X_domain, torch.ones_like(d2u), create_graph=True)[0]
-        d4u = torch.autograd.grad(d3u, X_domain, torch.ones_like(d3u), create_graph=True)[0]
+        dy = torch.autograd.grad(Y_domain, X_domain, torch.ones_like(Y_domain), create_graph=True)[0]
+        d2y = torch.autograd.grad(dy, X_domain, torch.ones_like(dy), create_graph=True)[0]
+        d3y = torch.autograd.grad(d2y, X_domain, torch.ones_like(d2y), create_graph=True)[0]
+        d4y = torch.autograd.grad(d3y, X_domain, torch.ones_like(d3y), create_graph=True)[0]
 
-        d4u_dx4 = d4u[:,0].unsqueeze(1)
+        d4y_dx4 = d4y[:,0].unsqueeze(1)
 
         # loss is mean squared error
         # multiply RHS by L^4 to account for the length normalization (x is scaled by 1/L)
-        # return torch.mean((E*I*d4u_dx4 - X_domain[:,1].unsqueeze(1)*L**4)**2)
-        return torch.mean((E*I*d4u_dx4 - X_domain[:,1].unsqueeze(1))**2)
+        # return torch.mean((E*I*d4y_dx4 - X_domain[:,1].unsqueeze(1)*L**4)**2)
+        return torch.mean((E*I*d4y_dx4 - X_domain[:,1].unsqueeze(1))**2)
 
     def boundary_loss(self, Y_bc, X_bc):
-        pass
+        # for simply supported beam, y=0 and d2ydx2=0
+        dy = torch.autograd.grad(Y_bc, X_bc, torch.ones_like(Y_bc), create_graph=True)[0]
+        d2y = torch.autograd.grad(dy, X_bc, torch.ones_like(dy), create_graph=True)[0]
 
-    def data_loss():
-        pass
-    def compute_loss(self, Y_domain, Y_bc, X_domain, X_bc):
+        d2y_dx2 = d2y[:,0].unsqueeze(1)
+
+        # y=0
+        bc_loss1 = torch.mean((Y_bc - 0.)**2)
+        # d2ydx2=0
+        bc_loss2 = torch.mean((d2y_dx2 - 0)**2)
+        return bc_loss1, bc_loss2
+        
+
+    def data_loss(self, Y_domain, Y_bc, Y_domain_true, Y_bc_true):
+        Y_all_true = torch.cat([Y_domain_true, Y_bc_true], dim=0)
+        Y_all_pred = torch.cat([Y_domain, Y_bc], dim=0)
+        return torch.mean((Y_all_pred - Y_all_true)**2)
+
+    def compute_loss(self, Y_domain, Y_bc, X_domain, X_bc, Y_domain_true, Y_bc_true):
         loss_PDE = self.PDE_loss(Y_domain, X_domain)
-        print(loss_PDE)
-        loss = lambda_2*loss_PDE
+        loss_BC_1, loss_BC_2 = self.boundary_loss(Y_bc, X_bc)
+        loss_data = self.data_loss(Y_domain, Y_bc, Y_domain_true, Y_bc_true)
+        loss = lambda_1 * loss_BC_1 + lambda_1 * loss_BC_2 + lambda_2 * loss_PDE + lambda_3 * loss_data
+        #loss = lambda_1 * loss_BC_1 + lambda_1 * loss_BC_2 + lambda_3 * loss_data
+        #loss = loss_data
         return loss
-        # call the other loss functions and sum
         
 
 
@@ -191,15 +208,19 @@ for fold, (train_index, valid_index) in enumerate(kf.split(X_all)):
             X_domain = X_batch[is_domain.squeeze()].detach().clone().requires_grad_()
             X_bc = X_batch[is_bc.squeeze()].detach().clone().requires_grad_()
 
+            Y_domain_true = Y_batch[is_domain.squeeze()].detach().clone().requires_grad_()
+            Y_bc_true = Y_batch[is_bc.squeeze()].detach().clone().requires_grad_()
+
             Y_domain = model(X_domain)
             Y_bc = model(X_bc)
 
             # FILL IN
-            loss = model.compute_loss(Y_domain, Y_bc, X_domain, X_bc)
+            loss = model.compute_loss(Y_domain, Y_bc, X_domain, X_bc, Y_domain_true, Y_bc_true)
+            print(loss)
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-    exit()
+
     # COMPUTE VALIDATION LOSS
 
             
