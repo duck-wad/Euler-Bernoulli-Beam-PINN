@@ -108,6 +108,18 @@ class BeamPINN(nn.Module):
         # define the output layer with no activation
         self.output_layer = nn.Linear(num_neurons, num_output)
 
+        self.loss_function = nn.MSELoss(reduction = 'mean')
+
+        nn.init.xavier_normal_(self.input_layer[0].weight.data,gain=1.0)
+        nn.init.zeros_(self.input_layer[0].bias.data)
+        nn.init.xavier_normal_(self.output_layer.weight.data,gain=1.0)
+        nn.init.zeros_(self.output_layer.bias.data)
+
+        for i in range(num_layers-1):
+            layer = self.hidden_layer[i][0]
+            nn.init.xavier_normal_(layer.weight.data,gain=1.0)
+            nn.init.zeros_(layer.bias.data)
+
     def forward(self, X_batch):
         # torch.cat expects arrays of (N, 1), unsqueeze to get in that form
         #temp = torch.cat([x.unsqueeze(1),w[3].unsqueeze(1)],dim=1)
@@ -120,44 +132,38 @@ class BeamPINN(nn.Module):
 
         # need to do derivatives wrt the original X_domain tensor rather than splicing X_domain to get the 
         # x position tensor, that creates a new tensor and grad won't work
-        dy = torch.autograd.grad(Y_domain, X_domain, torch.ones_like(Y_domain), create_graph=True)[0]
-        d2y = torch.autograd.grad(dy, X_domain, torch.ones_like(dy), create_graph=True)[0]
-        d3y = torch.autograd.grad(d2y, X_domain, torch.ones_like(d2y), create_graph=True)[0]
+        dy = torch.autograd.grad(Y_domain, X_domain, torch.ones_like(Y_domain), retain_graph=True, create_graph=True)[0]
+        d2y = torch.autograd.grad(dy, X_domain, torch.ones_like(dy), retain_graph=True, create_graph=True)[0]
+        d3y = torch.autograd.grad(d2y, X_domain, torch.ones_like(d2y), retain_graph=True, create_graph=True)[0]
         d4y = torch.autograd.grad(d3y, X_domain, torch.ones_like(d3y), create_graph=True)[0]
 
         d4y_dx4 = d4y[:,0].unsqueeze(1)
 
         # loss is mean squared error
         # multiply RHS by L^4 to account for the length normalization (x is scaled by 1/L)
-        # return torch.mean((E*I*d4y_dx4 - X_domain[:,1].unsqueeze(1)*L**4)**2)
-        return torch.mean((E*I*d4y_dx4 - X_domain[:,1].unsqueeze(1))**2)
+        f = E*I*d4y_dx4
+        f_hat = X_domain[:,1].unsqueeze(1)
+        return self.loss_function(f, f_hat)
 
     def boundary_loss(self, Y_bc, X_bc):
         # for simply supported beam, y=0 and d2ydx2=0
-        dy = torch.autograd.grad(Y_bc, X_bc, torch.ones_like(Y_bc), create_graph=True)[0]
+        dy = torch.autograd.grad(Y_bc, X_bc, torch.ones_like(Y_bc), retain_graph=True, create_graph=True)[0]
         d2y = torch.autograd.grad(dy, X_bc, torch.ones_like(dy), create_graph=True)[0]
 
         d2y_dx2 = d2y[:,0].unsqueeze(1)
 
-        # y=0
-        bc_loss1 = torch.mean((Y_bc - 0.)**2)
-        # d2ydx2=0
-        bc_loss2 = torch.mean((d2y_dx2 - 0)**2)
-        return bc_loss1, bc_loss2
+        return (self.loss_function(Y_bc, torch.zeros_like(Y_bc)), self.loss_function(d2y_dx2, torch.zeros_like(d2y_dx2)))
         
-
     def data_loss(self, Y_domain, Y_bc, Y_domain_true, Y_bc_true):
         Y_all_true = torch.cat([Y_domain_true, Y_bc_true], dim=0)
         Y_all_pred = torch.cat([Y_domain, Y_bc], dim=0)
-        return torch.mean((Y_all_pred - Y_all_true)**2)
+        return self.loss_function(Y_all_pred, Y_all_true)
 
     def compute_loss(self, Y_domain, Y_bc, X_domain, X_bc, Y_domain_true, Y_bc_true):
         loss_PDE = self.PDE_loss(Y_domain, X_domain)
         loss_BC_1, loss_BC_2 = self.boundary_loss(Y_bc, X_bc)
         loss_data = self.data_loss(Y_domain, Y_bc, Y_domain_true, Y_bc_true)
         loss = lambda_1 * loss_BC_1 + lambda_1 * loss_BC_2 + lambda_2 * loss_PDE + lambda_3 * loss_data
-        #loss = lambda_1 * loss_BC_1 + lambda_1 * loss_BC_2 + lambda_3 * loss_data
-        #loss = loss_data
         return loss
         
 
