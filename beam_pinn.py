@@ -12,9 +12,12 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 ''' ----------------------- BEAM PARAMETERS ----------------------- '''
 
-L = 10.0 # meters
-E = 210000000000 # Pa
-I = 0.0005 # m4
+#L = 10.0 # meters
+#E = 210000000000 # Pa
+#I = 0.0005 # m4
+L = 1.0
+E = 1.0
+I = 1.0
 tol = 1e-5
 # simply supported
 
@@ -25,16 +28,17 @@ tol = 1e-5
 num_input = 2
 # 1 output, y
 num_output = 1
-# default neurons and layers from NVIDIA PhysicsNemo config
-num_neurons = 512
-num_layers = 6
+num_neurons = 128
+num_layers = 3
 # define the hyperparameters
 learning_rate = 1e-3
-epochs = 50
+w_decay = 1e-4
+momentum = 0.9
+epochs = 10000
 lambda_1 = 1e-2 # balance term for boundary condition
-lambda_2 = 1e-5 # balance term for PDE
-lambda_3 = 1e-1 # balance term for data loss
-batch_size = 1024
+lambda_2 = 1e-2 # balance term for PDE
+lambda_3 = 1e-3 # balance term for data loss
+batch_size = 4096
 
 
 ''' ----------------------- PREPARE DATA ----------------------- '''
@@ -122,7 +126,6 @@ class BeamPINN(nn.Module):
 
     def forward(self, X_batch):
         # torch.cat expects arrays of (N, 1), unsqueeze to get in that form
-        #temp = torch.cat([x.unsqueeze(1),w[3].unsqueeze(1)],dim=1)
         temp = self.input_layer(X_batch)
         temp = self.hidden_layer(temp)
         temp = self.output_layer(temp)
@@ -140,18 +143,20 @@ class BeamPINN(nn.Module):
         d4y_dx4 = d4y[:,0].unsqueeze(1)
 
         # loss is mean squared error
-        # multiply RHS by L^4 to account for the length normalization (x is scaled by 1/L)
         f = E*I*d4y_dx4
         f_hat = X_domain[:,1].unsqueeze(1)
         return self.loss_function(f, f_hat)
 
     def boundary_loss(self, Y_bc, X_bc):
+        # handle when Y_bc is empty
+        if Y_bc.numel() == 0:
+            return torch.tensor(0.0, device=Y_bc.device), torch.tensor(0.0, device=Y_bc.device)
         # for simply supported beam, y=0 and d2ydx2=0
         dy = torch.autograd.grad(Y_bc, X_bc, torch.ones_like(Y_bc), retain_graph=True, create_graph=True)[0]
         d2y = torch.autograd.grad(dy, X_bc, torch.ones_like(dy), create_graph=True)[0]
 
         d2y_dx2 = d2y[:,0].unsqueeze(1)
-
+        #print(self.loss_function(Y_bc, torch.zeros_like(Y_bc)))
         return (self.loss_function(Y_bc, torch.zeros_like(Y_bc)), self.loss_function(d2y_dx2, torch.zeros_like(d2y_dx2)))
         
     def data_loss(self, Y_domain, Y_bc, Y_domain_true, Y_bc_true):
@@ -163,7 +168,12 @@ class BeamPINN(nn.Module):
         loss_PDE = self.PDE_loss(Y_domain, X_domain)
         loss_BC_1, loss_BC_2 = self.boundary_loss(Y_bc, X_bc)
         loss_data = self.data_loss(Y_domain, Y_bc, Y_domain_true, Y_bc_true)
+        #print(loss_PDE)
+        #print(loss_BC_1)
+        #print(loss_BC_2)
+        #print(loss_data)
         loss = lambda_1 * loss_BC_1 + lambda_1 * loss_BC_2 + lambda_2 * loss_PDE + lambda_3 * loss_data
+        print(loss)
         return loss
         
 
@@ -196,7 +206,10 @@ for fold, (train_index, valid_index) in enumerate(kf.split(X_all)):
     # define network
     model = BeamPINN(num_input, num_output, num_neurons, num_layers).to(device)
     # define optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    #optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=w_decay)
+    #optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+
 
     for epoch in range(epochs):
         for X_batch, Y_batch in train_loader:
@@ -222,7 +235,7 @@ for fold, (train_index, valid_index) in enumerate(kf.split(X_all)):
 
             # FILL IN
             loss = model.compute_loss(Y_domain, Y_bc, X_domain, X_bc, Y_domain_true, Y_bc_true)
-            print(loss)
+            #print(loss)
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
