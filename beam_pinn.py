@@ -38,7 +38,7 @@ epochs = 10000
 lambda_1 = 1e-2 # balance term for boundary condition
 lambda_2 = 1e-2 # balance term for PDE
 lambda_3 = 1e-3 # balance term for data loss
-batch_size = 4096
+batch_size = 256
 
 
 ''' ----------------------- PREPARE DATA ----------------------- '''
@@ -159,21 +159,25 @@ class BeamPINN(nn.Module):
         #print(self.loss_function(Y_bc, torch.zeros_like(Y_bc)))
         return (self.loss_function(Y_bc, torch.zeros_like(Y_bc)), self.loss_function(d2y_dx2, torch.zeros_like(d2y_dx2)))
         
-    def data_loss(self, Y_domain, Y_bc, Y_domain_true, Y_bc_true):
-        Y_all_true = torch.cat([Y_domain_true, Y_bc_true], dim=0)
-        Y_all_pred = torch.cat([Y_domain, Y_bc], dim=0)
-        return self.loss_function(Y_all_pred, Y_all_true)
+    def data_loss(self, Y_pred, Y_true):
+        #Y_all_true = torch.cat([Y_domain_true, Y_bc_true], dim=0)
+        #Y_all_pred = torch.cat([Y_domain, Y_bc], dim=0)
+        return self.loss_function(Y_pred, Y_true)
 
     def compute_loss(self, Y_domain, Y_bc, X_domain, X_bc, Y_domain_true, Y_bc_true):
         loss_PDE = self.PDE_loss(Y_domain, X_domain)
         loss_BC_1, loss_BC_2 = self.boundary_loss(Y_bc, X_bc)
-        loss_data = self.data_loss(Y_domain, Y_bc, Y_domain_true, Y_bc_true)
+
+        Y_true = torch.cat([Y_domain_true, Y_bc_true], dim=0)
+        Y_pred = torch.cat([Y_domain, Y_bc], dim=0)
+
+        loss_data = self.data_loss(Y_pred, Y_true)
         #print(loss_PDE)
         #print(loss_BC_1)
         #print(loss_BC_2)
         #print(loss_data)
         loss = lambda_1 * loss_BC_1 + lambda_1 * loss_BC_2 + lambda_2 * loss_PDE + lambda_3 * loss_data
-        print(loss)
+        #print(loss)
         return loss
         
 
@@ -201,7 +205,7 @@ for fold, (train_index, valid_index) in enumerate(kf.split(X_all)):
     train_dataset = TensorDataset(X_train, Y_train)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     valid_dataset = TensorDataset(X_valid, Y_valid)
-    valid_dataset = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True)
+    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True)
     
     # define network
     model = BeamPINN(num_input, num_output, num_neurons, num_layers).to(device)
@@ -239,6 +243,14 @@ for fold, (train_index, valid_index) in enumerate(kf.split(X_all)):
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
+        
+        # compute validation loss 
+        if epoch % 50 == 0:
+            with torch.no_grad():
+                Y_valid_prediction = model(X_valid)
+                validation_data_loss = model.data_loss(Y_valid_prediction, Y_valid)
+                print(f'Epoch: {epoch}, Data Loss: {validation_data_loss} ')
+
 
     # COMPUTE VALIDATION LOSS
 
