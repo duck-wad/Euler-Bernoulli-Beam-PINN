@@ -255,7 +255,7 @@ if __name__ == "__main__":
                 optimizer.zero_grad()
             
             # compute validation loss 
-            if epoch % 1 == 0:
+            if epoch % 50 == 0:
                 with torch.no_grad():
                     Y_valid_prediction = model(X_valid)
                     data_loss_validation = model.data_loss(Y_valid_prediction, Y_valid)
@@ -263,7 +263,6 @@ if __name__ == "__main__":
                     fold_validation_loss.append(data_loss_validation.item())
         
         validation_loss.append(fold_validation_loss)
-        print(validation_loss)
 
         # run model on test data to compute testing loss
         with torch.no_grad():
