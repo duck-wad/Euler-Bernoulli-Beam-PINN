@@ -114,18 +114,18 @@ if __name__ == "__main__":
     num_input = 2
     # 1 output, y
     num_output = 1
-    num_neurons = 128
-    num_layers = 3
+    num_neurons = 512
+    num_layers = 6
     num_folds = 5 # for k fold
     # define the hyperparameters
-    learning_rate = 1e-3
+    learning_rate = 1e-4
     w_decay = 1e-4
     momentum = 0.9
     epochs = 10000
     lambda_1 = 1e-2 # balance term for boundary condition
-    lambda_2 = 1e-2 # balance term for PDE
-    lambda_3 = 1e-3 # balance term for data loss
-    batch_size = 1024
+    lambda_2 = 1e-3 # balance term for PDE
+    lambda_3 = 1e-2 # balance term for data loss
+    batch_size = 2048
 
 
     ''' ----------------------- PREPARE DATA ----------------------- '''
@@ -271,12 +271,14 @@ if __name__ == "__main__":
             print(f'Fold: {fold + 1}, Testing Data Loss: {data_loss_test} ')
             testing_loss.append([fold+1, data_loss_test.item()])
 
-        torch.save(model.state_dict(), f'fold_{fold+1}.pt')
+        os.makedirs('./folds', exist_ok=True)
+        torch.save(model.state_dict(), f'./folds/fold_{fold+1}.pt')
 
     # save testing and validation loss for each model to csv
+    os.makedirs('./loss', exist_ok=True)
     df_test = pd.DataFrame(testing_loss, columns=['Fold', 'Test_Loss'])
-    df_test.to_csv('testing_loss.csv', index=False)
+    df_test.to_csv('./loss/testing_loss.csv', index=False)
 
     df_validation = pd.DataFrame(validation_loss).T
     df_validation.columns = [f'Fold_{i+1}' for i in range(df_validation.shape[1])]
-    df_validation.to_csv('validation_loss.csv', index=False)
+    df_validation.to_csv('./loss/validation_loss.csv', index=False)
