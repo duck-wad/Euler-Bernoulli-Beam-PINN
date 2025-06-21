@@ -114,18 +114,18 @@ if __name__ == "__main__":
     num_input = 2
     # 1 output, y
     num_output = 1
-    num_neurons = 512
-    num_layers = 6
+    num_neurons = 64
+    num_layers = 2
     num_folds = 5 # for k fold
     # define the hyperparameters
     learning_rate = 1e-4
     w_decay = 1e-4
     momentum = 0.9
-    epochs = 10000
+    epochs = 1000
     lambda_1 = 1e-2 # balance term for boundary condition
     lambda_2 = 1e-3 # balance term for PDE
     lambda_3 = 1e-2 # balance term for data loss
-    batch_size = 2048
+    batch_size = 220
 
 
     ''' ----------------------- PREPARE DATA ----------------------- '''
@@ -165,6 +165,7 @@ if __name__ == "__main__":
     # put w into same shape as x and y
     w = w[:,np.newaxis]
     w = np.repeat(w, len(x[0]), axis=1)
+    w = w*-1
 
     # stack x and w into one input 
     X_all = np.stack((x,w), axis=2)
