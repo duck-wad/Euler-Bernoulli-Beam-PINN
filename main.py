@@ -18,9 +18,6 @@ if __name__ == "__main__":
 
     ''' ----------------------- BEAM PARAMETERS ----------------------- '''
 
-    #L = 10.0 # meters
-    #E = 210000000000 # Pa
-    #I = 0.0005 # m4
     L = 1.0
     E = 1.0
     I = 1.0
@@ -33,13 +30,12 @@ if __name__ == "__main__":
     # 1 output, y
     num_output = 1
     num_neurons = 32
-    num_layers = 1
+    num_layers = 2
     num_folds = 5 # for k fold
     # hyperparameters
     learning_rate = 1e-4
     w_decay = 1e-4
-    momentum = 0.9
-    epochs = 10000
+    epochs = 40000
 
     ''' ----------------------- IMPORT DATA ----------------------- '''
 
@@ -78,7 +74,6 @@ if __name__ == "__main__":
         # define optimizer
         #optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=w_decay)
-        #optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
 
         fold_loss_PDE = []
         fold_loss_BC1 = []
@@ -143,9 +138,10 @@ if __name__ == "__main__":
         num_epochs = list(range(len(fold_loss)))
         plt.figure(figsize=(10,6))
 
-        plt.plot(num_epochs, fold_loss_PDE, label='PDE Loss (EI*)')
-        plt.plot(num_epochs, fold_loss_BC1, label='BC1 Loss')
-        plt.plot(num_epochs, fold_loss_BC2, label='BC2 Loss')
+        
+        plt.plot(num_epochs, fold_loss_PDE, label=r'PDE Loss ($EI\frac{d^4y}{dx^4} = w$)')
+        plt.plot(num_epochs, fold_loss_BC1, label=r'BC1 Loss ($y=0$ for $x=0,L$)')
+        plt.plot(num_epochs, fold_loss_BC2, label=r'BC2 Loss ($EI\frac{d^2y}{dx^2}=0$)')
         plt.plot(num_epochs, fold_loss_data, label='Data Loss')
         plt.plot(num_epochs, fold_loss, label='Total Loss', linewidth=2, color='black')
 
