@@ -25,9 +25,9 @@ class BeamPINN(nn.Module):
             nn.init.xavier_normal_(layer.weight.data,gain=1.0)
             nn.init.zeros_(layer.bias.data)
 
-    def forward(self, X_batch):
+    def forward(self, X):
         # torch.cat expects arrays of (N, 1), unsqueeze to get in that form
-        temp = self.input_layer(X_batch)
+        temp = self.input_layer(X)
         temp = self.hidden_layer(temp)
         temp = self.output_layer(temp)
         return temp

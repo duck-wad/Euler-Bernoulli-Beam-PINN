@@ -7,4 +7,4 @@ pip install --no-index --upgrade pip
 pip install --no-index torch
 pip install --no-index scikit-learn
 
-python beam_pinn.py 
+python main.py 

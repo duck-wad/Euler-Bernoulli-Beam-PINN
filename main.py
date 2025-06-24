@@ -110,6 +110,7 @@ if __name__ == "__main__":
             loss = loss_BC1 + loss_BC2 + loss_PDE + loss_data
             #print(loss)
 
+            # track loss during training
             fold_loss_PDE.append(loss_PDE.item())
             fold_loss_BC1.append(loss_BC1.item())
             fold_loss_BC2.append(loss_BC2.item())
@@ -138,7 +139,6 @@ if __name__ == "__main__":
         num_epochs = list(range(len(fold_loss)))
         plt.figure(figsize=(10,6))
 
-        
         plt.plot(num_epochs, fold_loss_PDE, label=r'PDE Loss ($EI\frac{d^4y}{dx^4} = w$)')
         plt.plot(num_epochs, fold_loss_BC1, label=r'BC1 Loss ($y=0$ for $x=0,L$)')
         plt.plot(num_epochs, fold_loss_BC2, label=r'BC2 Loss ($EI\frac{d^2y}{dx^2}=0$)')
@@ -153,7 +153,7 @@ if __name__ == "__main__":
         plt.tight_layout()
         # save plot to loss folder
         os.makedirs('./loss', exist_ok=True)
-        plt.savefig(f'./loss/{fold+1}_training_loss.pdf', format='pdf')
+        plt.savefig(f'./loss/fold_{fold+1}_training_loss.pdf', format='pdf')
 
         # save model 
         os.makedirs('./folds', exist_ok=True)
