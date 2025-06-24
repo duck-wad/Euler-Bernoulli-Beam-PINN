@@ -4,16 +4,15 @@ import zipfile
 import os
 
 
-
 # if beam is discretized into n points, the network will expect n+1 inputs
 # 1 input is the x location on the beam
 # n inputs is the w(x) load at each discretized point on the beam
 # so the NN will learn to output a y(x), given a location on the beam x under the load w(x)
 
 def prepare_data():
-    
-    with zipfile.ZipFile('./compressed_data.zip', 'r') as zip_ref:
-        zip_ref.extractall('./data')
+
+    with zipfile.ZipFile('./data.zip', 'r') as zip_ref:
+        zip_ref.extractall('./data') 
     path = './data'
     files = os.listdir(path)
     files = [f for f in files if f[-3:] == 'csv']
@@ -39,6 +38,7 @@ def prepare_data():
         w.append(load)
 
     x = np.array(x) #n_files x n_points
+    x = np.expand_dims(x, axis=2)
     y = np.array(y) # n_files x n_points
     # w is not sorted because of sorting standard in file explorer, sort by ascending
     w = np.sort(np.array(w)) # n_files
@@ -48,7 +48,10 @@ def prepare_data():
     w = np.repeat(w, len(x[0]), axis=1)
     w = w[:,:,np.newaxis]
     w = np.repeat(w, len(x[0]), axis=2)
+    # multiply by -1 to put w(x) in the downward direction
+    w = w*-1
 
+    '''
     # normalize data so everything is between 0 to 1
     # for x, scale everything by the max x value (the length of the beam)
     # for w and y, since they vary by orders of magnitude over the entire dataset, 
@@ -57,8 +60,10 @@ def prepare_data():
     w = np.log(w)
     w = w / np.max(w)
     # y values could be negative. take the log of the absolute value, then multiply by the sign
-    
-    print(y[0])
+    #print(y)
+    y = np.sign(y) * np.log(np.abs(y)+1e-10)
+    print(y)
+    exit()
 
     y = np.log(y)
     print(y[0])
@@ -68,11 +73,10 @@ def prepare_data():
     print(w.shape)
     print(x.shape)
     exit()
+    '''
 
     # stack x and w into one input 
-    X_all = np.stack((x,w[:,:,0]), axis=2)
-    print(X_all)
-    exit()
+    X_all = np.concatenate((x, w), axis=2)
     # make y 3D array
     Y_all = y[...,np.newaxis]
 
@@ -84,10 +88,8 @@ def prepare_data():
     train_index = np.setdiff1d(all_index, test_index)
     X_test = X_all[test_index]
     Y_test = Y_all[test_index]
-    X_test = torch.tensor(X_test, requires_grad=True, dtype=torch.float32).to(device)
-    Y_test = torch.tensor(Y_test, requires_grad=True, dtype=torch.float32).to(device)
     # strip out the test samples from X_all 
     X_all = X_all[train_index]
     Y_all = Y_all[train_index]
 
-prepare_data()
+    return (X_all, Y_all, X_test, Y_test)

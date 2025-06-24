@@ -3,3 +3,5 @@
 /temp
 *.pt
 *.csv
+__pycache__
+/loss

@@ -32,7 +32,7 @@ class BeamPINN(nn.Module):
         temp = self.output_layer(temp)
         return temp
     
-    def PDE_loss(self, Y_domain, X_domain):
+    def PDE_loss(self, Y_domain, X_domain, E, I):
 
         # need to do derivatives wrt the original X_domain tensor rather than splicing X_domain to get the 
         # x position tensor, that creates a new tensor and grad won't work
@@ -48,7 +48,7 @@ class BeamPINN(nn.Module):
         f_hat = X_domain[:,1].unsqueeze(1)
         return self.loss_function(f, f_hat)
 
-    def boundary_loss(self, Y_bc, X_bc):
+    def boundary_loss(self, Y_bc, X_bc, E, I):
         # handle when Y_bc is empty
         if Y_bc.numel() == 0:
             return torch.tensor(0.0, device=Y_bc.device), torch.tensor(0.0, device=Y_bc.device)
@@ -57,26 +57,7 @@ class BeamPINN(nn.Module):
         d2y = torch.autograd.grad(dy, X_bc, torch.ones_like(dy), create_graph=True)[0]
 
         d2y_dx2 = d2y[:,0].unsqueeze(1)
-        #print(self.loss_function(Y_bc, torch.zeros_like(Y_bc)))
-        return (self.loss_function(Y_bc, torch.zeros_like(Y_bc)), self.loss_function(d2y_dx2, torch.zeros_like(d2y_dx2)))
+        return (self.loss_function(Y_bc, torch.zeros_like(Y_bc)), self.loss_function((E*I*d2y_dx2), torch.zeros_like(d2y_dx2)))
         
     def data_loss(self, Y_pred, Y_true):
-        #Y_all_true = torch.cat([Y_domain_true, Y_bc_true], dim=0)
-        #Y_all_pred = torch.cat([Y_domain, Y_bc], dim=0)
         return self.loss_function(Y_pred, Y_true)
-
-    def compute_loss(self, Y_domain, Y_bc, X_domain, X_bc, Y_domain_true, Y_bc_true):
-        loss_PDE = self.PDE_loss(Y_domain, X_domain)
-        loss_BC_1, loss_BC_2 = self.boundary_loss(Y_bc, X_bc)
-
-        Y_true = torch.cat([Y_domain_true, Y_bc_true], dim=0)
-        Y_pred = torch.cat([Y_domain, Y_bc], dim=0)
-
-        loss_data = self.data_loss(Y_pred, Y_true)
-        #print(loss_PDE)
-        #print(loss_BC_1)
-        #print(loss_BC_2)
-        #print(loss_data)
-        loss = lambda_1 * loss_BC_1 + lambda_1 * loss_BC_2 + lambda_2 * loss_PDE + lambda_3 * loss_data
-        print(loss)
-        return loss
