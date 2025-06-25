@@ -7,6 +7,7 @@ import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 from sklearn.model_selection import KFold
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from pinn_class import BeamPINN
 from prepare_data import prepare_data
@@ -47,7 +48,7 @@ if __name__ == "__main__":
 
 
     # kfold cross-validation with 5 splits
-    kf = KFold(n_splits=num_folds, shuffle=True, random_state=69)
+    kf = KFold(n_splits=num_folds, shuffle=True, random_state=42)
 
     ''' ----------------------- TRAINING LOOP ----------------------- '''
 
@@ -72,7 +73,7 @@ if __name__ == "__main__":
         # define network
         model = BeamPINN(num_input, num_output, num_neurons, num_layers).to(device)
         # define optimizer
-        #optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        #optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=w_decay)
         optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=w_decay)
 
         fold_loss_PDE = []
@@ -81,7 +82,7 @@ if __name__ == "__main__":
         fold_loss_data = []
         fold_loss = []
 
-        for epoch in range(epochs):
+        for epoch in tqdm(range(epochs)):
             # find the indices of boundary points where x==0 or x==L
             x_vals = X_train[:,0].unsqueeze(1)
             is_left = torch.abs(x_vals - 0.0) < tol
@@ -122,17 +123,17 @@ if __name__ == "__main__":
             optimizer.zero_grad()
             
             # compute validation loss 
-            if epoch % 50 == 0:
+            if epoch % 100 == 0:
                 with torch.no_grad():
                     Y_valid_prediction = model(X_valid)
                     data_loss_validation = model.data_loss(Y_valid_prediction, Y_valid)
-                    print(f'Epoch: {epoch}, Data Loss: {data_loss_validation} ')
+                    tqdm.write(f'Epoch: {epoch}, Data Loss: {data_loss_validation}')
         
         # run model on test data to compute testing loss
         with torch.no_grad():
             Y_test_prediction = model(X_test)
             data_loss_test = model.data_loss(Y_test_prediction, Y_test)
-            print(f'Fold: {fold + 1}, Testing Data Loss: {data_loss_test} ')
+            tqdm.write(f'Fold: {fold + 1}, Testing Data Loss: {data_loss_test}')
             testing_loss.append([fold+1, data_loss_test.item()])
 
         # plot the training loss and save plot
@@ -141,7 +142,7 @@ if __name__ == "__main__":
 
         plt.plot(num_epochs, fold_loss_PDE, label=r'PDE Loss ($EI\frac{d^4y}{dx^4} = w$)')
         plt.plot(num_epochs, fold_loss_BC1, label=r'BC1 Loss ($y=0$ for $x=0,L$)')
-        plt.plot(num_epochs, fold_loss_BC2, label=r'BC2 Loss ($EI\frac{d^2y}{dx^2}=0$)')
+        plt.plot(num_epochs, fold_loss_BC2, label=r'BC2 Loss ($EI\frac{d^2y}{dx^2}=0$ for $x=0,L$)')
         plt.plot(num_epochs, fold_loss_data, label='Data Loss')
         plt.plot(num_epochs, fold_loss, label='Total Loss', linewidth=2, color='black')
 
