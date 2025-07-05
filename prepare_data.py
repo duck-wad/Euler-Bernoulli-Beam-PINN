@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import zipfile
 import os
-
+import torch
 
 # if beam is discretized into n points, the network will expect n+1 inputs
 # 1 input is the x location on the beam
@@ -24,7 +24,7 @@ def prepare_data():
     # corresponding displacement
     y = []
     # corresponding rotation
-    theta = []
+    #theta = []
 
     for i, file in enumerate(files):
         df = pd.read_csv(path + "/" + file)
@@ -35,7 +35,7 @@ def prepare_data():
         y_temp = df["Nodal transverse displacement (m)"].to_numpy()
         y.append(y_temp)
 
-        theta_temp = df["Nodal rotation (rad)"].to_numpy()
+        #theta_temp = df["Nodal rotation (rad)"].to_numpy()
 
         # in the future if w(x) is not a UDL, will need to handle this differently
         load = float(file.split(".csv")[0])
@@ -44,7 +44,7 @@ def prepare_data():
     x = np.array(x) #n_files x n_points
     x = np.expand_dims(x, axis=2)
     y = np.array(y) # n_files x n_points
-    theta = np.array(theta)
+    #theta = np.array(theta)
     # w is not sorted because of sorting standard in file explorer, sort by ascending
     w = np.sort(np.array(w)) # n_files
     # put w into n_files x n_points x n_points
@@ -98,4 +98,18 @@ def prepare_data():
     Y_all = Y_all[train_index]
 
     return (X_all, Y_all, X_test, Y_test)
+
+def separate_domain_bc(X, Y, L):
+    x_vals = X[:,0].unsqueeze(1)
+    is_left = torch.abs(x_vals - 0.0) < 1e-5
+    is_right =  torch.abs(x_vals - L) < 1e-5
+    is_bc = is_left | is_right
+    is_domain = ~is_bc
+
+    X_domain = X[is_domain.squeeze()].detach().clone().requires_grad_()
+    X_bc = X[is_bc.squeeze()].detach().clone().requires_grad_()
+    Y_domain = Y[is_domain.squeeze()].detach().clone().requires_grad_()
+    Y_bc = Y[is_bc.squeeze()].detach().clone().requires_grad_()
+
+    return X_domain, X_bc, Y_domain, Y_bc
 
