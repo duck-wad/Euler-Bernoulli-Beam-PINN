@@ -23,6 +23,8 @@ def prepare_data():
     w = []
     # corresponding displacement
     y = []
+    # corresponding rotation
+    theta = []
 
     for i, file in enumerate(files):
         df = pd.read_csv(path + "/" + file)
@@ -33,6 +35,8 @@ def prepare_data():
         y_temp = df["Nodal transverse displacement (m)"].to_numpy()
         y.append(y_temp)
 
+        theta_temp = df["Nodal rotation (rad)"].to_numpy()
+
         # in the future if w(x) is not a UDL, will need to handle this differently
         load = float(file.split(".csv")[0])
         w.append(load)
@@ -40,6 +44,7 @@ def prepare_data():
     x = np.array(x) #n_files x n_points
     x = np.expand_dims(x, axis=2)
     y = np.array(y) # n_files x n_points
+    theta = np.array(theta)
     # w is not sorted because of sorting standard in file explorer, sort by ascending
     w = np.sort(np.array(w)) # n_files
     # put w into n_files x n_points x n_points
@@ -93,3 +98,4 @@ def prepare_data():
     Y_all = Y_all[train_index]
 
     return (X_all, Y_all, X_test, Y_test)
+

@@ -36,7 +36,9 @@ if __name__ == "__main__":
     # hyperparameters
     learning_rate = 1e-4
     w_decay = 1e-4
-    epochs = 40000
+    epochs = 10000
+    lambda_PDE = 1e-2
+    lambda_BC = 1e-1
 
     ''' ----------------------- IMPORT DATA ----------------------- '''
 
@@ -54,7 +56,6 @@ if __name__ == "__main__":
 
     # for each of k folds, iterate for {epoch} epochs
     # in each epoch
-    validation_loss = []
     testing_loss = []
 
     for fold, (train_index, valid_index) in enumerate(kf.split(X_all)):
@@ -66,7 +67,6 @@ if __name__ == "__main__":
         X_valid = (X_all[valid_index]).reshape(-1,num_input)
         Y_valid = (Y_all[valid_index]).reshape(-1,num_output)
 
-        # batch the training data into batches of {batch_size}
         train_dataset = TensorDataset(X_train, Y_train)
         valid_dataset = TensorDataset(X_valid, Y_valid)
         
@@ -81,6 +81,8 @@ if __name__ == "__main__":
         fold_loss_BC2 = []
         fold_loss_data = []
         fold_loss = []
+        validation_loss = []
+        validation_epochs = []
 
         for epoch in tqdm(range(epochs)):
             # find the indices of boundary points where x==0 or x==L
@@ -108,7 +110,7 @@ if __name__ == "__main__":
             loss_BC1, loss_BC2 = model.boundary_loss(Y_bc, X_bc, E, I)
             loss_data = model.data_loss(Y_pred, Y_true)
             
-            loss = loss_BC1 + loss_BC2 + loss_PDE + loss_data
+            loss = loss_BC1 + lambda_BC * loss_BC2 + lambda_PDE * loss_PDE + loss_data
             #print(loss)
 
             # track loss during training
@@ -118,6 +120,7 @@ if __name__ == "__main__":
             fold_loss_data.append(loss_data.item())
             fold_loss.append(loss.item())
 
+            nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -127,6 +130,8 @@ if __name__ == "__main__":
                 with torch.no_grad():
                     Y_valid_prediction = model(X_valid)
                     data_loss_validation = model.data_loss(Y_valid_prediction, Y_valid)
+                    validation_loss.append(data_loss_validation.item())
+                    validation_epochs.append(epoch)
                     tqdm.write(f'Epoch: {epoch}, Data Loss: {data_loss_validation}')
         
         # run model on test data to compute testing loss
@@ -143,8 +148,9 @@ if __name__ == "__main__":
         plt.plot(num_epochs, fold_loss_PDE, label=r'PDE Loss ($EI\frac{d^4y}{dx^4} = w$)')
         plt.plot(num_epochs, fold_loss_BC1, label=r'BC1 Loss ($y=0$ for $x=0,L$)')
         plt.plot(num_epochs, fold_loss_BC2, label=r'BC2 Loss ($EI\frac{d^2y}{dx^2}=0$ for $x=0,L$)')
-        plt.plot(num_epochs, fold_loss_data, label='Data Loss')
-        plt.plot(num_epochs, fold_loss, label='Total Loss', linewidth=2, color='black')
+        plt.plot(num_epochs, fold_loss_data, label='Training Data Loss')
+        plt.plot(validation_epochs, validation_loss, label='Validation Loss')
+        plt.plot(num_epochs, fold_loss, label='Total Training Loss', linewidth=2, color='black')
 
         plt.xlabel('Epochs')
         plt.ylabel('Loss')

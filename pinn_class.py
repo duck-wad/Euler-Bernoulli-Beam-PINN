@@ -6,10 +6,12 @@ class BeamPINN(nn.Module):
         super().__init__()
         activation = nn.Tanh
         # define the input layer
-        self.input_layer = nn.Sequential(nn.Linear(num_input, num_neurons), activation())
+        self.input_layer = nn.Sequential(nn.Linear(num_input, num_neurons), 
+                                         nn.BatchNorm1d(num_neurons), activation())
         # define the hidden layer as sequence of num_layers
-        self.hidden_layer = nn.Sequential(*[nn.Sequential(nn.Linear(num_neurons, num_neurons), 
-                                                          activation()) for _ in range(num_layers-1)])
+        self.hidden_layer = nn.Sequential(*[nn.Sequential(
+            nn.Linear(num_neurons, num_neurons), nn.BatchNorm1d(num_neurons),
+            activation()) for _ in range(num_layers-1)])
         # define the output layer with no activation
         self.output_layer = nn.Linear(num_neurons, num_output)
 
