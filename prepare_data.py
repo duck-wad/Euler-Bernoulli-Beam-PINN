@@ -24,7 +24,7 @@ def prepare_data():
     # corresponding displacement
     y = []
     # corresponding rotation
-    #theta = []
+    theta = []
 
     for i, file in enumerate(files):
         df = pd.read_csv(path + "/" + file)
@@ -35,7 +35,8 @@ def prepare_data():
         y_temp = df["Nodal transverse displacement (m)"].to_numpy()
         y.append(y_temp)
 
-        #theta_temp = df["Nodal rotation (rad)"].to_numpy()
+        theta_temp = df["Nodal rotation (rad)"].to_numpy()
+        theta.append(theta_temp)
 
         # in the future if w(x) is not a UDL, will need to handle this differently
         load = float(file.split(".csv")[0])
@@ -44,7 +45,7 @@ def prepare_data():
     x = np.array(x) #n_files x n_points
     x = np.expand_dims(x, axis=2)
     y = np.array(y) # n_files x n_points
-    #theta = np.array(theta)
+    theta = np.array(theta)
     # w is not sorted because of sorting standard in file explorer, sort by ascending
     w = np.sort(np.array(w)) # n_files
     # put w into n_files x n_points x n_points
@@ -84,6 +85,7 @@ def prepare_data():
     X_all = np.concatenate((x, w), axis=2)
     # make y 3D array
     Y_all = y[...,np.newaxis]
+    DYDX_all = theta[...,np.newaxis]
 
     # pull random sample of 20% for testing
     holdout_size = round(len(X_all)*0.2)
@@ -93,11 +95,13 @@ def prepare_data():
     train_index = np.setdiff1d(all_index, test_index)
     X_test = X_all[test_index]
     Y_test = Y_all[test_index]
+    DYDX_test = DYDX_all[test_index]
     # strip out the test samples from X_all 
     X_all = X_all[train_index]
     Y_all = Y_all[train_index]
+    DYDX_all = DYDX_all[train_index]
 
-    return (X_all, Y_all, X_test, Y_test)
+    return (X_all, Y_all, X_test, Y_test, DYDX_all, DYDX_test)
 
 def separate_domain_bc(X, Y, L):
     x_vals = X[:,0].unsqueeze(1)

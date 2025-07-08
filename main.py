@@ -41,14 +41,18 @@ if __name__ == "__main__":
 
     ''' ----------------------- IMPORT DATA ----------------------- '''
 
-    X_all, Y_all, X_test, Y_test = prepare_data()
+    # X_all contains the x and w (inputs to NN)
+    X_all, Y_all, X_test, Y_test, DYDX_all, DYDX_test = prepare_data()
     X_all = torch.tensor(X_all, requires_grad=True, dtype=torch.float32).to(device)
     Y_all = torch.tensor(Y_all, requires_grad=True, dtype=torch.float32).to(device)
+    DYDX_all = torch.tensor(DYDX_all, requires_grad=False, dtype=torch.float32).to(device)
     X_test = torch.tensor(X_test, requires_grad=True, dtype=torch.float32).to(device)
     Y_test = torch.tensor(Y_test, requires_grad=True, dtype=torch.float32).to(device)
+    DYDX_test = torch.tensor(DYDX_test, requires_grad=False, dtype=torch.float32).to(device)
 
     X_test = X_test.reshape(-1,num_input)
     Y_test = Y_test.reshape(-1,num_output)
+    DYDX_test = DYDX_test.reshape(-1,num_output)
     # split testing data into BC and domain points
     X_domain_test, X_bc_test, Y_domain_true_test, Y_bc_true_test = separate_domain_bc(X_test, Y_test, L)
 
@@ -66,8 +70,10 @@ if __name__ == "__main__":
         # instead of shape (n_beams, n_points, n_features) it become (n_beams x n_points, n_features)
         X_train = (X_all[train_index]).reshape(-1,num_input)
         Y_train = (Y_all[train_index]).reshape(-1,num_output)
+        DYDX_train = (DYDX_all[train_index]).reshape(-1,num_output)
         X_valid = (X_all[valid_index]).reshape(-1,num_input)
         Y_valid = (Y_all[valid_index]).reshape(-1,num_output)
+        DYDX_valid = (DYDX_all[valid_index]).reshape(-1,num_output)
 
         # split dataset into domain points and BC points
         X_domain, X_bc, Y_domain_true, Y_bc_true = separate_domain_bc(X_train, Y_train, L)
@@ -85,7 +91,8 @@ if __name__ == "__main__":
         fold_loss_PDE = []
         fold_loss_BC1 = []
         fold_loss_BC2 = []
-        fold_loss_data = []
+        fold_loss_data_displacement = []
+        fold_loss_data_slope = []
         fold_loss = []
         validation_loss = []
         validation_epochs = []
@@ -97,6 +104,7 @@ if __name__ == "__main__":
             # train the model
             Y_domain = model(X_domain)
             Y_bc = model(X_bc)
+            Y_domain_bc = model(X_train)
 
             Y_true = torch.cat([Y_domain_true, Y_bc_true], dim=0)
             Y_pred = torch.cat([Y_domain, Y_bc], dim=0)
@@ -104,19 +112,21 @@ if __name__ == "__main__":
             # compute the loss
             loss_PDE = model.PDE_loss(Y_domain, X_domain, E, I)
             loss_BC1, loss_BC2 = model.boundary_loss(Y_bc, X_bc, E, I)
-            loss_data = model.data_loss(Y_pred, Y_true)
+            loss_data_displacement = model.displacement_data_loss(Y_pred, Y_true)
+            loss_data_slope = model.slope_data_loss(Y_domain_bc, X_train, DYDX_train)
             
-            loss = loss_BC1 + lambda_BC * loss_BC2 + lambda_PDE * loss_PDE + loss_data
+            loss = loss_BC1 + lambda_BC * loss_BC2 + lambda_PDE * loss_PDE + loss_data_displacement + loss_data_slope
 
             # track loss during training
             fold_loss_PDE.append(loss_PDE.item())
             fold_loss_BC1.append(loss_BC1.item())
             fold_loss_BC2.append(loss_BC2.item())
-            fold_loss_data.append(loss_data.item())
+            fold_loss_data_displacement.append(loss_data_displacement.item())
+            fold_loss_data_slope.append(loss_data_slope.item())
             fold_loss.append(loss.item())
 
             nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            loss.backward()
+            loss.backward(retain_graph=True)
             optimizer.step()
             optimizer.zero_grad()
             
@@ -125,14 +135,18 @@ if __name__ == "__main__":
                 #with torch.no_grad():
                 Y_domain_valid = model(X_domain_valid)
                 Y_bc_valid = model(X_bc_valid)
+                Y_domain_bc_valid = model(X_valid)
+
                 Y_true_valid = torch.cat([Y_domain_true_valid, Y_bc_true_valid])
                 Y_pred_valid = torch.cat([Y_domain_valid, Y_bc_valid])
 
                 loss_PDE_valid = model.PDE_loss(Y_domain_valid, X_domain_valid, E, I)
                 loss_BC1_valid, loss_BC2_valid = model.boundary_loss(Y_bc_valid, X_bc_valid, E, I)
-                loss_data_valid = model.data_loss(Y_pred_valid, Y_true_valid)
+                loss_data_displacement_valid = model.displacement_data_loss(Y_pred_valid, Y_true_valid)
+                loss_data_slope_valid = model.slope_data_loss(Y_domain_bc_valid, X_valid, DYDX_valid)
 
-                loss_valid = loss_BC1_valid + lambda_BC * loss_BC2_valid + lambda_PDE * loss_PDE_valid + loss_data_valid
+                loss_valid = (loss_BC1_valid + lambda_BC * loss_BC2_valid + lambda_PDE * loss_PDE_valid + 
+                              loss_data_displacement_valid + loss_data_slope_valid)
 
                 validation_loss.append(loss_valid.item())
                 validation_epochs.append(epoch)
@@ -143,13 +157,18 @@ if __name__ == "__main__":
         # run model on test data to compute testing loss
         Y_domain_test = model(X_domain_test)
         Y_bc_test = model(X_bc_test)
+        Y_domain_bc_test = model(X_test)
+
         Y_true_test = torch.cat([Y_domain_true_test, Y_bc_true_test])
         Y_pred_test = torch.cat([Y_domain_test, Y_bc_test])
 
         loss_PDE_test = model.PDE_loss(Y_domain_test, X_domain_test, E, I)
         loss_BC1_test, loss_BC2_test = model.boundary_loss(Y_bc_test, X_bc_test, E, I)
-        loss_data_test = model.data_loss(Y_pred_test, Y_true_test)
-        loss_test = loss_BC1_test + lambda_BC * loss_BC2_test + lambda_PDE * loss_PDE_test + loss_data_test
+        loss_data_displacement_test = model.displacement_data_loss(Y_pred_test, Y_true_test)
+        loss_data_slope_test = model.slope_data_loss(Y_domain_bc_test, X_test, DYDX_test)
+
+        loss_test = (loss_BC1_test + lambda_BC * loss_BC2_test + lambda_PDE * loss_PDE_test + 
+                     loss_data_displacement_test + loss_data_slope_test)
 
         tqdm.write(f'Fold: {fold + 1}, Total Testing Loss: {round(loss_test.item(), 5)}')
 
@@ -162,7 +181,8 @@ if __name__ == "__main__":
         plt.plot(num_epochs, fold_loss_PDE, label=r'Training PDE Loss ($EI\frac{d^4y}{dx^4} = w$)')
         plt.plot(num_epochs, fold_loss_BC1, label=r'Training BC1 Loss ($y=0$ for $x=0,L$)')
         plt.plot(num_epochs, fold_loss_BC2, label=r'Training BC2 Loss ($EI\frac{d^2y}{dx^2}=0$ for $x=0,L$)')
-        plt.plot(num_epochs, fold_loss_data, label='Training Data Loss')
+        plt.plot(num_epochs, fold_loss_data_displacement, label='Training Displacement Data Loss')
+        plt.plot(num_epochs, fold_loss_data_slope, label='Training Slope Data Loss')
         plt.plot(num_epochs, fold_loss, label='Total Training Loss', linewidth=2, color='black')
         plt.plot(validation_epochs, validation_loss, label='Total Validation Loss')
         plt.plot([], [], '', label=f'Total Testing Loss = {round(loss_test.item(), 5)}', linewidth=0, color='white')
