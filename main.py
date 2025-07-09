@@ -116,7 +116,7 @@ if __name__ == "__main__":
             fold_loss.append(loss.item())
 
             nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            loss.backward()
+            loss.backward(retain_graph=True)
             optimizer.step()
             optimizer.zero_grad()
             
