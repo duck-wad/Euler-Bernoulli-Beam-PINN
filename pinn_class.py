@@ -61,5 +61,18 @@ class BeamPINN(nn.Module):
         d2y_dx2 = d2y[:,0].unsqueeze(1)
         return (self.loss_function(Y_bc, torch.zeros_like(Y_bc)), self.loss_function((E*I*d2y_dx2), torch.zeros_like(d2y_dx2)))
         
-    def data_loss(self, Y_pred, Y_true):
+    def displacement_data_loss(self, Y_pred, Y_true):
         return self.loss_function(Y_pred, Y_true)
+    
+    def slope_data_loss(self, Y_pred, X, DYDX_true):
+
+        dy = torch.autograd.grad(Y_pred, X, torch.ones_like(Y_pred), retain_graph=True, create_graph=True)[0]
+        return self.loss_function(dy[:,0].unsqueeze(1), DYDX_true)
+
+    def return_derivatives(self, Y, X):
+        dy = torch.autograd.grad(Y, X, torch.ones_like(Y), retain_graph=True, create_graph=True)[0]
+        d2y = torch.autograd.grad(dy, X, torch.ones_like(dy), retain_graph=True, create_graph=True)[0]
+        d3y = torch.autograd.grad(d2y, X, torch.ones_like(d2y), retain_graph=True, create_graph=True)[0]
+        d4y = torch.autograd.grad(d3y, X, torch.ones_like(d3y), create_graph=True)[0]
+
+        return dy, d2y, d3y, d4y
