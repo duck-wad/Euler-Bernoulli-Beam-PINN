@@ -10,13 +10,14 @@ import matplotlib.pyplot as plt
 # n inputs is the w(x) load at each discretized point on the beam
 # so the NN will learn to output a y(x), given a location on the beam x under the load w(x)
 
+
 def prepare_data(device):
 
-    with zipfile.ZipFile('./data.zip', 'r') as zip_ref:
-        zip_ref.extractall('./data') 
-    path = './data'
+    with zipfile.ZipFile("./data.zip", "r") as zip_ref:
+        zip_ref.extractall("./data")
+    path = "./data"
     files = os.listdir(path)
-    files = [f for f in files if f[-3:] == 'csv']
+    files = [f for f in files if f[-3:] == "csv"]
 
     # location on beam
     x = []
@@ -43,26 +44,26 @@ def prepare_data(device):
         load = float(file.split(".csv")[0])
         w.append(load)
 
-    x = np.array(x) #n_files x n_points
+    x = np.array(x)  # n_files x n_points
     x = np.expand_dims(x, axis=2)
-    y = np.array(y) # n_files x n_points
+    y = np.array(y)  # n_files x n_points
     theta = np.array(theta)
     # w is not sorted because of sorting standard in file explorer, sort by ascending
-    w = np.sort(np.array(w)) # n_files
+    w = np.sort(np.array(w))  # n_files
     # put w into n_files x n_points x n_points
     # for each x point, it corresponds with the full w(x) over the beam
-    w = w[:,np.newaxis]
+    w = w[:, np.newaxis]
     w = np.repeat(w, len(x[0]), axis=1)
-    w = w[:,:,np.newaxis]
+    w = w[:, :, np.newaxis]
     w = np.repeat(w, len(x[0]), axis=2)
     # multiply by -1 to put w(x) in the downward direction
-    w = w*-1
+    w = w * -1
 
-    # stack x and w into one input 
+    # stack x and w into one input
     X_all = np.concatenate((x, w), axis=2)
     # make y 3D array
-    Y_all = y[...,np.newaxis]
-    DYDX_all = theta[...,np.newaxis]
+    Y_all = y[..., np.newaxis]
+    DYDX_all = theta[..., np.newaxis]
 
     # pull random sample of 10% for testing and 20% for validation
     num_samples = len(X_all)
@@ -72,8 +73,8 @@ def prepare_data(device):
     num_validation = round(num_samples * 0.2)
     num_train = num_samples - num_test - num_validation
     test_index = all_indices[:num_test]
-    validation_index = all_indices[num_test:num_test+num_validation]
-    train_index = all_indices[num_test+num_validation:]
+    validation_index = all_indices[num_test : num_test + num_validation]
+    train_index = all_indices[num_test + num_validation :]
 
     X_train = X_all[train_index]
     Y_train = Y_all[train_index]
@@ -88,21 +89,44 @@ def prepare_data(device):
     # convert numpy arrays to torch tensors
     X_train = torch.tensor(X_train, requires_grad=True, dtype=torch.float32).to(device)
     Y_train = torch.tensor(Y_train, requires_grad=True, dtype=torch.float32).to(device)
-    DYDX_train = torch.tensor(DYDX_train, requires_grad=True, dtype=torch.float32).to(device)
-    X_validation = torch.tensor(X_validation, requires_grad=True, dtype=torch.float32).to(device)
-    Y_validation = torch.tensor(Y_validation, requires_grad=True, dtype=torch.float32).to(device)
-    X_validation = torch.tensor(X_validation, requires_grad=True, dtype=torch.float32).to(device)
-    DYDX_validation = torch.tensor(DYDX_validation, requires_grad=True, dtype=torch.float32).to(device)
+    DYDX_train = torch.tensor(DYDX_train, requires_grad=True, dtype=torch.float32).to(
+        device
+    )
+    X_validation = torch.tensor(
+        X_validation, requires_grad=True, dtype=torch.float32
+    ).to(device)
+    Y_validation = torch.tensor(
+        Y_validation, requires_grad=True, dtype=torch.float32
+    ).to(device)
+    X_validation = torch.tensor(
+        X_validation, requires_grad=True, dtype=torch.float32
+    ).to(device)
+    DYDX_validation = torch.tensor(
+        DYDX_validation, requires_grad=True, dtype=torch.float32
+    ).to(device)
     X_test = torch.tensor(X_test, requires_grad=True, dtype=torch.float32).to(device)
     Y_test = torch.tensor(Y_test, requires_grad=True, dtype=torch.float32).to(device)
-    DYDX_test = torch.tensor(DYDX_test, requires_grad=True, dtype=torch.float32).to(device)
+    DYDX_test = torch.tensor(DYDX_test, requires_grad=True, dtype=torch.float32).to(
+        device
+    )
 
-    return (X_train, Y_train, DYDX_train, X_validation, Y_validation, DYDX_validation, X_test, Y_test, DYDX_test)
+    return (
+        X_train,
+        Y_train,
+        DYDX_train,
+        X_validation,
+        Y_validation,
+        DYDX_validation,
+        X_test,
+        Y_test,
+        DYDX_test,
+    )
+
 
 def separate_domain_bc(X, Y, L):
-    x_vals = X[:,0].unsqueeze(1)
+    x_vals = X[:, 0].unsqueeze(1)
     is_left = torch.abs(x_vals - 0.0) < 1e-5
-    is_right =  torch.abs(x_vals - L) < 1e-5
+    is_right = torch.abs(x_vals - L) < 1e-5
     is_bc = is_left | is_right
     is_domain = ~is_bc
 
@@ -113,30 +137,92 @@ def separate_domain_bc(X, Y, L):
 
     return X_domain, X_bc, Y_domain, Y_bc
 
-def plot_training_loss(loss_PDE, loss_BC1, loss_BC2, loss_displacement, loss_slope, loss_total, num_epochs, name):
-    
-    plt.figure(figsize=(10,6))
 
-    plt.plot(num_epochs, loss_PDE, label=r'Training PDE Loss ($EI\frac{d^4y}{dx^4} = w$)')
-    plt.plot(num_epochs, loss_BC1, label=r'Training BC1 Loss ($y=0$ for $x=0,L$)')
-    plt.plot(num_epochs, loss_BC2, label=r'Training BC2 Loss ($EI\frac{d^2y}{dx^2}=0$ for $x=0,L$)')
-    plt.plot(num_epochs, loss_displacement, label='Training Displacement Data Loss')
-    plt.plot(num_epochs, loss_slope, label='Training Slope Data Loss')
-    plt.plot(num_epochs, loss_total, label='Total Training Loss', linewidth=2, color='black')
+def plot_training_loss(
+    loss_PDE,
+    loss_BC1,
+    loss_BC2,
+    loss_displacement,
+    loss_slope,
+    loss_total,
+    num_epochs,
+    name,
+):
 
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.yscale('log')
-    plt.title('Loss vs Epochs')
-    plt.legend(loc='upper right')
+    fig = plt.figure(figsize=(10, 6))
+
+    plt.plot(
+        num_epochs, loss_PDE, label=r"Training PDE Loss ($EI\frac{d^4y}{dx^4} = w$)"
+    )
+    plt.plot(num_epochs, loss_BC1, label=r"Training BC1 Loss ($y=0$ for $x=0,L$)")
+    plt.plot(
+        num_epochs,
+        loss_BC2,
+        label=r"Training BC2 Loss ($EI\frac{d^2y}{dx^2}=0$ for $x=0,L$)",
+    )
+    plt.plot(num_epochs, loss_displacement, label="Training Displacement Data Loss")
+    plt.plot(num_epochs, loss_slope, label="Training Slope Data Loss")
+    plt.plot(
+        num_epochs, loss_total, label="Total Training Loss", linewidth=2, color="black"
+    )
+
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.yscale("log")
+    plt.title("Loss vs Epochs")
+    plt.legend(loc="upper right")
     plt.tight_layout()
 
-    os.makedirs('./loss', exist_ok=True)
-    plt.savefig(f'./loss/{name}_training_loss.pdf', format='pdf')
+    # os.makedirs("./loss", exist_ok=True)
+    # plt.savefig(f"./loss/{name}_training_loss.pdf", format="pdf")
+    return fig
 
-def analytical_solution():
-    pass
 
-def plot_beam_results(Y, DY, D2Y, D3Y, D4Y):
-    print("succss")
+def analytical_solution(X, EI, L, w):
+    anal_Y = w * X / (24.0 * EI) * (L**3 - 2 * L * X**2 + X**3)
+    anal_DY = w / (24.0 * EI) * (L**3 - 6 * L * X**2 + 4 * X**3)
+    anal_M = -w * X / 2.0 * (L - X)
+    anal_V = -w * (L / 2.0 - X)
+    anal_W = np.full_like(X, w)
+    return anal_Y, anal_DY, anal_M, anal_V, anal_W
 
+
+def plot_beam_results(Y, DY, D2Y, D3Y, D4Y, X, EI, L, w):
+
+    anal_Y, anal_DY, anal_M, anal_V, anal_W = analytical_solution(X, EI, L, w)
+
+    fig, axs = plt.subplots(5, 1, figsize=(10, 12), sharex=True)
+
+    axs[0].plot(X, Y, label="Predicted", color="blue")
+    axs[0].plot(X, anal_Y, label="Analytical", linestyle="--", color="black")
+    axs[0].set_ylabel("Deflection (m)")
+    axs[0].legend()
+
+    axs[1].plot(X, DY, label="Predicted", color="green")
+    axs[1].plot(X, anal_DY, label="Analytical", linestyle="--", color="black")
+    axs[1].set_ylabel("Slope (rad)")
+    axs[1].legend()
+
+    axs[2].plot(X, D2Y * EI, label="Predicted", color="orange")
+    axs[2].plot(X, anal_M, label="Analytical", linestyle="--", color="black")
+    axs[2].set_ylabel("Moment (N*m)")
+    axs[2].legend()
+
+    axs[3].plot(X, D3Y * EI, label="Predicted", color="red")
+    axs[3].plot(X, anal_V, label="Analytical", linestyle="--", color="black")
+    axs[3].set_ylabel("Shear (N)")
+    axs[3].legend()
+
+    axs[4].plot(X, D4Y * EI, label="Predicted", color="purple")
+    axs[4].plot(X, anal_W, label="Analytical", linestyle="--", color="black")
+    axs[4].set_ylabel("Load (N/m)")
+    axs[4].legend()
+    axs[4].set_xlabel("Beam position (m)")
+
+    for ax in axs:
+        ax.grid(True)
+
+    plt.suptitle(f"Validation results under a {abs(w)} N/m load")
+    plt.tight_layout()
+
+    return fig
