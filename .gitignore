@@ -7,3 +7,4 @@ __pycache__
 /loss
 /.vscode
 /training results
+*.txt

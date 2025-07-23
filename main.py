@@ -8,6 +8,7 @@ from torch.utils.data import TensorDataset, DataLoader
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from tqdm import tqdm
+import time
 
 from pinn_class import BeamPINN
 from helper import *
@@ -16,6 +17,8 @@ from helper import *
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 if __name__ == "__main__":
+
+    total_start_time = time.time()
 
     """----------------------- BEAM PARAMETERS -----------------------"""
 
@@ -32,22 +35,34 @@ if __name__ == "__main__":
 
     # list of different sets of hyperparameters to tune the model
     # [num_neurons, num_layers, learning_rate, w_decay, lambda_PDE, lambda_BC, epochs]
+    """ hyperparameters = [
+        [32, 2, 1e-4, 1e-4, 1e-2, 1e-1, 5000],
+        [64, 2, 1e-4, 1e-4, 1e-2, 1e-1, 5000],
+        [128, 2, 1e-4, 1e-4, 1e-2, 1e-1, 5000],
+        [256, 2, 1e-4, 1e-4, 1e-2, 1e-1, 5000],
+        [32, 3, 1e-4, 1e-4, 1e-2, 1e-1, 5000],
+        [64, 3, 1e-4, 1e-4, 1e-2, 1e-1, 5000],
+        [128, 3, 1e-4, 1e-4, 1e-2, 1e-1, 5000],
+        [256, 3, 1e-4, 1e-4, 1e-2, 1e-1, 5000],
+        [32, 2, 1e-4, 1e-4, 1e-2, 1e-1, 10000],
+        [64, 2, 1e-4, 1e-4, 1e-2, 1e-1, 10000],
+        [128, 2, 1e-4, 1e-4, 1e-2, 1e-1, 10000],
+        [256, 2, 1e-4, 1e-4, 1e-2, 1e-1, 10000],
+    ] """
     hyperparameters = [
-        [32, 2, 1e-4, 1e-4, 1e-2, 1e-1, 1e-2, 1e-1, 5000],
-        [64, 2, 1e-4, 1e-4, 1e-2, 1e-1, 1e-2, 1e-1, 5000],
-        [128, 2, 1e-4, 1e-4, 1e-2, 1e-1, 1e-2, 1e-1, 5000],
-        [256, 2, 1e-4, 1e-4, 1e-2, 1e-1, 1e-2, 1e-1, 5000],
-        [32, 3, 1e-4, 1e-4, 1e-2, 1e-1, 1e-2, 1e-1, 5000],
-        [64, 3, 1e-4, 1e-4, 1e-2, 1e-1, 1e-2, 1e-1, 5000],
-        [128, 3, 1e-4, 1e-4, 1e-2, 1e-1, 1e-2, 1e-1, 5000],
-        [256, 3, 1e-4, 1e-4, 1e-2, 1e-1, 1e-2, 1e-1, 5000],
-        [32, 2, 1e-4, 1e-4, 1e-2, 1e-1, 1e-2, 1e-1, 10000],
-        [64, 2, 1e-4, 1e-4, 1e-2, 1e-1, 1e-2, 1e-1, 10000],
-        [128, 2, 1e-4, 1e-4, 1e-2, 1e-1, 1e-2, 1e-1, 10000],
-        [256, 2, 1e-4, 1e-4, 1e-2, 1e-1, 1e-2, 1e-1, 10000],
+        [32, 2, 1e-4, 1e-4, 1e-2, 1e-1, 200],
+        [64, 2, 1e-4, 1e-4, 1e-2, 1e-1, 200],
     ]
 
+    os.makedirs("./training results", exist_ok=True)
+    runtime_file = "./training results/runtime.txt"
+    with open(runtime_file, "w") as f:
+        f.write("Model Training Runtimes\n")
+        f.write("-----------------------\n")
+
     for hyperparameter in hyperparameters:
+
+        hyper_start_time = time.time()
 
         num_neurons = hyperparameter[0]
         num_layers = hyperparameter[1]
@@ -166,7 +181,6 @@ if __name__ == "__main__":
 
         num_epochs = list(range(len(train_loss)))
 
-        os.makedirs("./training results", exist_ok=True)
         with PdfPages(f"./training results/{model_name}_results.pdf") as pdf:
 
             fig_loss = plot_training_loss(
@@ -228,3 +242,15 @@ if __name__ == "__main__":
                 )
                 pdf.savefig(fig)
                 plt.close(fig)
+
+        hyper_end_time = time.time()
+        hyper_runtime = hyper_end_time - hyper_start_time
+        hyper_minutes = hyper_runtime / 60
+        with open(runtime_file, "a") as f:
+            f.write(f"Model {model_name} runtime (min): {hyper_minutes}\n")
+
+    total_end_time = time.time()
+    total_runtime = total_end_time - total_start_time
+    total_minutes = total_runtime / 60
+    with open(runtime_file, "a") as f:
+        f.write(f"Total runtime (min): {total_minutes}\n")
