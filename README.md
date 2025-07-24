@@ -4,7 +4,9 @@
 - The PINN predicts the deflection and its derivatives at 100 points along the beam under a uniformly distributed load.
 - The PDE it is trained on is:
 
-<img width="324" height="171" alt="image" src="https://github.com/user-attachments/assets/1e31fc5b-7ecf-4c70-8a7d-7ccbef879f01" />
+$$
+EI \frac{d^4 y}{dx^4} = w
+$$
 
 - There are two main files:
   - "main_data" is a data-driven PINN model, using both data loss and PDE loss to train the network. Data was generated using the FEA code I developed for Euler-Bernoulli beams: https://github.com/duck-wad/FEA-of-Euler-Bernoulli-Beams
