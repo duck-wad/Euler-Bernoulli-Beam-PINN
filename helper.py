@@ -61,11 +61,13 @@ def prepare_data(device):
 
     # stack x and w into one input
     X_all = np.concatenate((x, w), axis=2)
+
     # make y 3D array
     Y_all = y[..., np.newaxis]
     DYDX_all = theta[..., np.newaxis]
 
     # pull random sample of 10% for testing and 20% for validation
+    np.random.seed(42)
     num_samples = len(X_all)
     # shuffle indices and slice through the shuffled list to get the indices for testing, validation, training
     all_indices = np.random.permutation(num_samples)
@@ -123,7 +125,44 @@ def prepare_data(device):
     )
 
 
-def separate_domain_bc(X, Y, L):
+def prepare_linspace(length, num_points, max_load, device):
+
+    x = np.linspace(0, length, num_points, endpoint=True)
+    x = np.tile(x, (max_load, 1))
+    x = x[:, :, np.newaxis]
+
+    w = np.linspace(1, max_load, max_load, endpoint=True)[:, np.newaxis, np.newaxis]
+    w = np.repeat(w, num_points, axis=1)
+    w = w * -1
+
+    X_all = np.concatenate((x, w), axis=2)
+
+    # split into training, testing and validation
+    np.random.seed(42)
+    num_samples = len(X_all)
+    all_indices = np.random.permutation(num_samples)
+
+    num_test = round(num_samples * 0.1)
+    num_validation = round(num_samples * 0.2)
+
+    test_index = all_indices[:num_test]
+    validation_index = all_indices[num_test : num_test + num_validation]
+    train_index = all_indices[num_test + num_validation :]
+
+    X_train = X_all[train_index]
+    X_validation = X_all[validation_index]
+    X_test = X_all[test_index]
+
+    X_train = torch.tensor(X_train, requires_grad=True, dtype=torch.float32).to(device)
+    X_validation = torch.tensor(
+        X_validation, requires_grad=True, dtype=torch.float32
+    ).to(device)
+    X_test = torch.tensor(X_test, requires_grad=True, dtype=torch.float32).to(device)
+
+    return X_train, X_validation, X_test
+
+
+def separate_domain_bc(X, Y, L, nodata=False):
     x_vals = X[:, 0].unsqueeze(1)
     is_left = torch.abs(x_vals - 0.0) < 1e-5
     is_right = torch.abs(x_vals - L) < 1e-5
@@ -132,8 +171,12 @@ def separate_domain_bc(X, Y, L):
 
     X_domain = X[is_domain.squeeze()].detach().clone().requires_grad_()
     X_bc = X[is_bc.squeeze()].detach().clone().requires_grad_()
-    Y_domain = Y[is_domain.squeeze()].detach().clone().requires_grad_()
-    Y_bc = Y[is_bc.squeeze()].detach().clone().requires_grad_()
+    # for the nodata model, return dummy Y values
+    Y_domain = []
+    Y_bc = []
+    if not nodata:
+        Y_domain = Y[is_domain.squeeze()].detach().clone().requires_grad_()
+        Y_bc = Y[is_bc.squeeze()].detach().clone().requires_grad_()
 
     return X_domain, X_bc, Y_domain, Y_bc
 
@@ -147,6 +190,7 @@ def plot_training_loss(
     loss_total,
     num_epochs,
     name,
+    nodata=False,
 ):
 
     fig = plt.figure(figsize=(10, 6))
@@ -160,8 +204,9 @@ def plot_training_loss(
         loss_BC2,
         label=r"Training BC2 Loss ($EI\frac{d^2y}{dx^2}=0$ for $x=0,L$)",
     )
-    plt.plot(num_epochs, loss_displacement, label="Training Displacement Data Loss")
-    plt.plot(num_epochs, loss_slope, label="Training Slope Data Loss")
+    if not nodata:
+        plt.plot(num_epochs, loss_displacement, label="Training Displacement Data Loss")
+        plt.plot(num_epochs, loss_slope, label="Training Slope Data Loss")
     plt.plot(
         num_epochs, loss_total, label="Total Training Loss", linewidth=2, color="black"
     )
@@ -173,8 +218,6 @@ def plot_training_loss(
     plt.legend(loc="upper right")
     plt.tight_layout()
 
-    # os.makedirs("./loss", exist_ok=True)
-    # plt.savefig(f"./loss/{name}_training_loss.pdf", format="pdf")
     return fig
 
 
@@ -213,9 +256,12 @@ def plot_beam_results(Y, DY, D2Y, D3Y, D4Y, X, EI, L, w):
     axs[3].set_ylabel("Shear (N)")
     axs[3].legend()
 
+    # the fourth deriv may appear noisy since W is a constant
+    # set a range for the y-axis
     axs[4].plot(X, D4Y * EI, label="Predicted", color="purple")
     axs[4].plot(X, anal_W, label="Analytical", linestyle="--", color="black")
     axs[4].set_ylabel("Load (N/m)")
+    axs[4].set_ylim(anal_W[0] + 5, anal_W[0] - 5)
     axs[4].legend()
     axs[4].set_xlabel("Beam position (m)")
 
