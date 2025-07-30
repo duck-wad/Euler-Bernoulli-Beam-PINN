@@ -35,22 +35,11 @@ if __name__ == "__main__":
     # 1 output, y
     num_output = 1
     # once this loss is reached, stop training the model
-    loss_threshold = 0.0005
+    loss_threshold = 0.00015
 
     # list of different sets of hyperparameters to tune the model
     # [num_neurons, num_layers, learning_rate, w_decay, lambda_PDE, lambda_BC, max_norm, max_epochs]
-    hyperparameters = [
-        [64, 3, 1e-3, 1e-4, 1e-2, 1e-0, 1.0, 20000],
-        [64, 3, 9e-4, 1e-4, 1e-2, 1e-0, 1.0, 20000],
-        [64, 3, 8e-4, 1e-4, 1e-2, 1e-0, 1.0, 20000],
-        [64, 3, 7e-4, 1e-4, 1e-2, 1e-0, 1.0, 20000],
-        [64, 3, 6e-4, 1e-4, 1e-2, 1e-0, 1.0, 20000],
-        [64, 3, 5e-4, 1e-4, 1e-2, 1e-0, 1.0, 20000],
-        [64, 3, 4e-4, 1e-4, 1e-2, 1e-0, 1.0, 20000],
-        [64, 3, 3e-4, 1e-4, 1e-2, 1e-0, 1.0, 20000],
-        [64, 3, 2e-4, 1e-4, 1e-2, 1e-0, 1.0, 20000],
-        [64, 3, 1e-4, 1e-4, 1e-2, 1e-0, 1.0, 20000],
-    ]
+    hyperparameters = [[256, 2, 1e-4, 1e-4, 1e-2, 1e-0, 1.0, 50000]]
 
     os.makedirs("./training results", exist_ok=True)
     runtime_file = "./training results/runtime.txt"
@@ -93,7 +82,7 @@ if __name__ == "__main__":
         """ ----------------------- IMPORT DATA ----------------------- """
 
         X_train, X_validation, X_test = prepare_linspace(
-            L, num_points, max_load, device
+            L, num_points, 1, max_load, device
         )
 
         # flatten the training tensors, but maintain the structure of validation and testing because we

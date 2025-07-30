@@ -36,13 +36,7 @@ if __name__ == "__main__":
 
     # list of different sets of hyperparameters to tune the model
     # [num_neurons, num_layers, learning_rate, w_decay, lambda_PDE, lambda_BC, max_norm, epochs]
-    hyperparameters = [
-        [64, 3, 3e-5, 8e-4, 1e-2, 1e-0, 1.0, 10000],
-    ]
-    """ hyperparameters = [
-        [32, 4, 1e-4, 1e-3, 1e-2, 1e-1, 10000],
-        [256, 2, 1e-4, 1e-4, 1e-2, 1e-1, 10000],
-    ] """
+    hyperparameters = [[64, 3, 1e-4, 1e-4, 1e-2, 1e-0, 1.0, 30000]]
 
     os.makedirs("./training results", exist_ok=True)
     runtime_file = "./training results/runtime.txt"

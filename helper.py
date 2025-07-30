@@ -125,13 +125,15 @@ def prepare_data(device):
     )
 
 
-def prepare_linspace(length, num_points, max_load, device):
+def prepare_linspace(length, num_points, min_load, max_load, device):
 
     x = np.linspace(0, length, num_points, endpoint=True)
-    x = np.tile(x, (max_load, 1))
+    x = np.tile(x, (max_load - min_load + 1, 1))
     x = x[:, :, np.newaxis]
 
-    w = np.linspace(1, max_load, max_load, endpoint=True)[:, np.newaxis, np.newaxis]
+    w = np.linspace(min_load, max_load, (max_load - min_load) + 1, endpoint=True)[
+        :, np.newaxis, np.newaxis
+    ]
     w = np.repeat(w, num_points, axis=1)
     w = w * -1
 
