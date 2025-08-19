@@ -29,12 +29,12 @@ if __name__ == "__main__":
 
     """ ----------------------- NETWORK PARAMETERS ----------------------- """
 
-    # x and w(x) inputs (currently 21 discretized points on beam)
+    # x and w(x) inputs (currently 11 discretized points on beam)
     num_input = 22
     # 1 output, y
     num_output = 1
     # once this loss is reached stop training the model
-    loss_threshold = 0.2
+    loss_threshold = 0.4
 
     # list of different sets of hyperparameters to tune the model
     # [num_neurons, num_layers, learning_rate, w_decay, lambda_PDE, lambda_BC, max_norm, epochs]
@@ -80,9 +80,11 @@ if __name__ == "__main__":
                 str(lambda_BC),
                 str(max_norm),
                 str(epochs),
-                "data",
+                "data_pde",
             ]
         )
+
+        """ ----------------------- IMPORT DATA ----------------------- """
 
         (
             X_train,
@@ -117,6 +119,10 @@ if __name__ == "__main__":
             model.parameters(), lr=learning_rate, weight_decay=w_decay
         )
 
+        # arrays to store training data
+        train_loss_PDE = []
+        train_loss_BC1 = []
+        train_loss_BC2 = []
         train_loss_data_displacement = []
         train_loss_data_slope = []
         train_loss = []
@@ -131,6 +137,10 @@ if __name__ == "__main__":
             Y_full_train_pred = model(X_train)
 
             # compute the loss
+            loss_PDE_train = model.PDE_loss(Y_domain_train_pred, X_domain_train, E, I)
+            loss_BC1_train, loss_BC2_train = model.boundary_loss(
+                Y_bc_train_pred, X_bc_train, E, I
+            )
             loss_data_displacement_train = model.displacement_data_loss(
                 Y_full_train_pred, Y_train
             )
@@ -138,9 +148,18 @@ if __name__ == "__main__":
                 Y_full_train_pred, X_train, DYDX_train
             )
 
-            loss_train = loss_data_displacement_train + loss_data_slope_train
+            loss_train = (
+                loss_BC1_train
+                + lambda_BC * loss_BC2_train
+                + lambda_PDE * loss_PDE_train
+                + loss_data_displacement_train
+                + loss_data_slope_train
+            )
 
             # track loss during training
+            train_loss_PDE.append(loss_PDE_train.item())
+            train_loss_BC1.append(loss_BC1_train.item())
+            train_loss_BC2.append(loss_BC2_train.item())
             train_loss_data_displacement.append(loss_data_displacement_train.item())
             train_loss_data_slope.append(loss_data_slope_train.item())
             train_loss.append(loss_train.item())
@@ -172,15 +191,14 @@ if __name__ == "__main__":
         with PdfPages(f"./training results/{model_name}_results.pdf") as pdf:
 
             fig_loss = plot_training_loss(
-                [],
-                [],
-                [],
+                train_loss_PDE,
+                train_loss_BC1,
+                train_loss_BC2,
                 train_loss_data_displacement,
                 train_loss_data_slope,
                 train_loss,
                 num_epochs,
                 model_name,
-                nopde=True,
             )
             pdf.savefig(fig_loss)
             plt.close(fig_loss)

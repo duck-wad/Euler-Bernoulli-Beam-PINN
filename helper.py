@@ -193,19 +193,22 @@ def plot_training_loss(
     num_epochs,
     name,
     nodata=False,
+    nopde=False,
 ):
 
     fig = plt.figure(figsize=(10, 6))
 
-    plt.plot(
-        num_epochs, loss_PDE, label=r"Training PDE Loss ($EI\frac{d^4y}{dx^4} = w$)"
-    )
-    plt.plot(num_epochs, loss_BC1, label=r"Training BC1 Loss ($y=0$ for $x=0,L$)")
-    plt.plot(
-        num_epochs,
-        loss_BC2,
-        label=r"Training BC2 Loss ($EI\frac{d^2y}{dx^2}=0$ for $x=0,L$)",
-    )
+    if not nopde:
+        plt.plot(
+            num_epochs, loss_PDE, label=r"Training PDE Loss ($EI\frac{d^4y}{dx^4} = w$)"
+        )
+        plt.plot(num_epochs, loss_BC1, label=r"Training BC1 Loss ($y=0$ for $x=0,L$)")
+        plt.plot(
+            num_epochs,
+            loss_BC2,
+            label=r"Training BC2 Loss ($EI\frac{d^2y}{dx^2}=0$ for $x=0,L$)",
+        )
+
     if not nodata:
         plt.plot(num_epochs, loss_displacement, label="Training Displacement Data Loss")
         plt.plot(num_epochs, loss_slope, label="Training Slope Data Loss")

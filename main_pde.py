@@ -26,7 +26,7 @@ if __name__ == "__main__":
     E = 1.0
     I = 1.0
     max_load = 100
-    num_points = 101
+    num_points = 21
 
     """ ----------------------- NETWORK PARAMETERS ----------------------- """
 
@@ -35,11 +35,17 @@ if __name__ == "__main__":
     # 1 output, y
     num_output = 1
     # once this loss is reached, stop training the model
-    loss_threshold = 0.00015
+    # loss_threshold = 0.00015
+    loss_threshold = 0.0002
 
     # list of different sets of hyperparameters to tune the model
     # [num_neurons, num_layers, learning_rate, w_decay, lambda_PDE, lambda_BC, max_norm, max_epochs]
-    hyperparameters = [[256, 2, 1e-4, 1e-4, 1e-2, 1e-0, 1.0, 50000]]
+    # hyperparameters = [[256, 2, 1e-4, 1e-4, 1e-2, 1e-0, 1.0, 50000]]
+    # hyperparameters = [[64, 3, 1e-4, 1e-4, 1e-2, 1e-0, 1.0, 30000]]
+
+    hyperparameters = [
+        [64, 2, 2e-5, 1e-4, 1e-2, 1e-0, 1.0, 30000],
+    ]
 
     os.makedirs("./training results", exist_ok=True)
     runtime_file = "./training results/runtime.txt"
@@ -76,6 +82,7 @@ if __name__ == "__main__":
                 str(lambda_BC),
                 str(max_norm),
                 str(max_epochs),
+                "pde",
             ]
         )
 
