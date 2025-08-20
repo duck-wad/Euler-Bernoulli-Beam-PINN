@@ -41,9 +41,6 @@ if __name__ == "__main__":
     hyperparameters = [
         [64, 2, 2e-5, 1e-4, 1e-2, 1e-0, 1.0, 30000],
     ]
-    """ hyperparameters = [
-        [64, 2, 2e-5, 1e-4, 1e-0, 1e-0, 1.0, 30000],
-    ] """
 
     os.makedirs("./training results", exist_ok=True)
     runtime_file = "./training results/runtime.txt"

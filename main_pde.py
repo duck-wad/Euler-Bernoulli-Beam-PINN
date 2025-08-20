@@ -40,8 +40,6 @@ if __name__ == "__main__":
 
     # list of different sets of hyperparameters to tune the model
     # [num_neurons, num_layers, learning_rate, w_decay, lambda_PDE, lambda_BC, max_norm, max_epochs]
-    # hyperparameters = [[256, 2, 1e-4, 1e-4, 1e-2, 1e-0, 1.0, 50000]]
-    # hyperparameters = [[64, 3, 1e-4, 1e-4, 1e-2, 1e-0, 1.0, 30000]]
 
     hyperparameters = [
         [64, 2, 2e-5, 1e-4, 1e-2, 1e-0, 1.0, 30000],
