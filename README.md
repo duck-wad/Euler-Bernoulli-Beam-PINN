@@ -8,9 +8,10 @@ $$
 EI \frac{d^4 y}{dx^4} = w
 $$
 
-- There are two main files:
-  - "main_data" is a data-driven PINN model, using both data loss and PDE loss to train the network. Data was generated using the FEA code I developed for Euler-Bernoulli beams: https://github.com/duck-wad/FEA-of-Euler-Bernoulli-Beams
-  - "main_nodata" is a purely physics trained PINN model, using only the PDE and BC loss.
+- There are three main files:
+  - "main_data" is a traditional data-driven neural network, using only the data loss to train the network. Data was generated using an FEA code: https://github.com/duck-wad/FEA-of-Euler-Bernoulli-Beams
+  - "main_pde" is a purely physics-trained PINN model, using only the PDE and BC loss.
+  - "main_data_pde" is a hybrid PINN model, using both data loss and PDE loss to train the network.
 
 <img width="708" height="417" alt="image" src="https://github.com/user-attachments/assets/32151697-13eb-4ca4-be24-93cd30d49347" />
 
