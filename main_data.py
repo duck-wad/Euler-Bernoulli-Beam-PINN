@@ -34,7 +34,7 @@ if __name__ == "__main__":
     # 1 output, y
     num_output = 1
     # once this loss is reached stop training the model
-    loss_threshold = 0.2
+    loss_threshold = 0.3
 
     # list of different sets of hyperparameters to tune the model
     # [num_neurons, num_layers, learning_rate, w_decay, lambda_PDE, lambda_BC, max_norm, epochs]
